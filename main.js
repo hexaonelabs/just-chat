@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { format, fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import relayer from './src/relay.js';
@@ -14,14 +14,9 @@ async function createWindow() {
     height: 600,
     webPreferences: {
       nodeIntegration: true,
-      preload: join(__dirname, 'preload.js')
+      contextIsolation: false,
     }
   });
-
-  // // Dynamically import preload.js
-  // const preloadPath = join(__dirname, 'preload.js');
-  // const preloadModule = await import(preloadPath);
-  // mainWindow.webContents.session.setPreloads([preloadModule.default]);
 
   await mainWindow.loadURL(
     format({
@@ -48,8 +43,10 @@ app.disableHardwareAcceleration();
 
 app.on('ready', async ()=> {
   const result = await relayer();
-  const mainWindow = await createWindow();
-  mainWindow.webContents.send('relayer-addresses', JSON.stringify({result}));
+  ipcMain.handle('get-relayer-addresses', async (event, args) => {
+    return result.toString().split(',');
+  });
+  await createWindow();
 })
 
 app.on('window-all-closed', function () {
