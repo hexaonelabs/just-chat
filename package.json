@@ -40,6 +40,7 @@
     "@libp2p/webtransport": "^4.1.9",
     "html5-qrcode": "^2.3.8",
     "libp2p": "^1.9.4",
+    "ngx-electronyzer": "^18.1.0",
     "qrcode": "^1.5.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
