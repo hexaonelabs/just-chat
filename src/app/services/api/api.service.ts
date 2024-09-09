@@ -26,22 +26,18 @@ import { webTransport } from '@libp2p/webtransport';
 import * as filters from '@libp2p/websockets/filters';
 import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
 import { yamux } from '@chainsafe/libp2p-yamux';
+import { ElectronService } from 'ngx-electronyzer';
 
 import { Message, Room } from '../../interfaces';
 
 export const PUBSUB_PEER_DISCOVERY = 'browser-peer-discovery';
-const bootstrapPeers = [
-  // '/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
-  // '/dnsaddr/bootstrap.libp2p.io/ipfs/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
-  '/ip4/127.0.0.1/tcp/9001/ws/p2p/12D3KooWEA8YK4y5hZS3VmEmDZ1HMw2oSHPfuBMrz5pXoH26Xbp2',
-  '/ip4/192.168.1.22/tcp/9001/ws/p2p/12D3KooWEA8YK4y5hZS3VmEmDZ1HMw2oSHPfuBMrz5pXoH26Xbp2',
-];
 
 @Injectable({
   providedIn: 'root',
 })
 export class ApiService {
   private libp2p!: Libp2p;
+  private _bootstrapPeers: string[] = [];
   private readonly messagesSubject = new BehaviorSubject<{
     [roomId: string]: Message[];
   }>({});
@@ -55,14 +51,36 @@ export class ApiService {
   public readonly rooms$ = this.roomsSubject.asObservable();
   public readonly connected$ = this._connected$.asObservable();
 
-  constructor() {
-    this._initLibp2p();
-    (window as any)?.electronAPI.onRelayerAddresses((value: any) => {
-      console.log({onRelayerAddresses: value})
-    })
+  constructor(
+    private readonly _electronService: ElectronService // private apiService: ApiService
+  ) {
+
+    this._init();
   }
 
-  private async _initLibp2p() {
+  private async _init() {
+    const isElectron = this._electronService.isElectronApp;
+    if (isElectron) {
+      console.log('[INFO] Running in Electron app');
+      const bootstrapPeersRelayers = await this._electronService.ipcRenderer.invoke('get-relayer-addresses'); 
+      console.log('[INFO] Bootstrap peers relayers:', bootstrapPeersRelayers);
+      await this._initLibp2p({
+        bootstrapPeers: bootstrapPeersRelayers,
+      });
+    } else {
+      console.log('[INFO] Running in Browser');
+      await this._initLibp2p({
+        bootstrapPeers: [],
+      });
+    }
+  }
+
+  private async _initLibp2p({
+    bootstrapPeers = [],
+  }: { 
+    bootstrapPeers?: string[];
+  }) {
+    this._bootstrapPeers = bootstrapPeers;
     this.libp2p = await createLibp2p({
       addresses: {
         listen: ['/webrtc'],
@@ -87,8 +105,7 @@ export class ApiService {
       peerDiscovery: [
         bootstrap({
           list: [
-            // '/ip4/127.0.0.1/tcp/9001/ws/p2p/12D3KooWQb5Urhdfr4tPekt7ZBtKcHU5rh57wmJNmNfp2e3k711V',
-            ...bootstrapPeers,
+            ...this._bootstrapPeers,
           ],
         }),
         pubsubPeerDiscovery({
@@ -324,7 +341,7 @@ export class ApiService {
       let nodeType = [];
 
       // detect if this is a bootstrap node
-      if (bootstrapPeers.includes(peer.toString())) {
+      if (this._bootstrapPeers.includes(peer.toString())) {
         nodeType.push('bootstrap');
       }
 
