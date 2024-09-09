@@ -5,6 +5,8 @@
 /tmp
 /out-tsc
 /bazel-out
+/**-x64/
+/**-win32/
 
 # Node
 /node_modules
